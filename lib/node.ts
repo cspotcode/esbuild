@@ -351,9 +351,12 @@ let startWorkerThreadService = (worker_threads: typeof import('worker_threads'))
   };
 };
 
-let startSyncServiceWorker = () => {
+export let startSyncServiceWorker = () => {
   let workerPort: import('worker_threads').MessagePort = worker_threads!.workerData;
   let parentPort = worker_threads!.parentPort!;
+  if(!parentPort || !workerPort) {
+    setImmediate(startSyncServiceWorker);
+  }
   let servicePromise = startService();
 
   // MessagePort doesn't copy the properties of Error objects. We still want
@@ -369,7 +372,14 @@ let startSyncServiceWorker = () => {
     return properties;
   };
 
-  parentPort.on('message', (msg: MainToWorkerMessage) => {
+  parentPort.on('message', onMessage);
+  // Because of potential setImmediate delay above, there may already be messages to receive.
+  while(true) {
+    const msg = worker_threads!.receiveMessageOnPort(parentPort) as MainToWorkerMessage | undefined;
+    if(msg) onMessage(msg);
+    else break;
+  }
+  function onMessage(msg: MainToWorkerMessage) {
     servicePromise.then(async (service) => {
       let { sharedBuffer, id, command, args } = msg;
       let sharedBufferView = new Int32Array(sharedBuffer);
@@ -399,10 +409,5 @@ let startSyncServiceWorker = () => {
       // thread was already waiting for us before the shared value was changed.
       Atomics.notify(sharedBufferView, 0, Infinity);
     });
-  });
+  }
 };
-
-// If we're in the worker thread, start the worker code
-if (worker_threads && !worker_threads.isMainThread) {
-  startSyncServiceWorker();
-}
