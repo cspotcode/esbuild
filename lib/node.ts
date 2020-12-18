@@ -277,7 +277,7 @@ let workerThreadService: WorkerThreadService | null = null;
 
 let startWorkerThreadService = (worker_threads: typeof import('worker_threads')): WorkerThreadService => {
   let { port1: mainPort, port2: workerPort } = new worker_threads.MessageChannel();
-  let worker = new worker_threads.Worker(__filename, {
+  let worker = new worker_threads.Worker(path.join(__dirname, 'node_worker_thread.js'), {
     workerData: workerPort,
     transferList: [workerPort],
   });
