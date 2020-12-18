@@ -280,8 +280,8 @@ let startWorkerThreadService = (worker_threads: typeof import('worker_threads'))
   let worker = new worker_threads.Worker(`
     start();
     function start() {
-      const {workerData: {mainPath}} = require('worker_threads');
-      if(mainPath) require(mainPath).startSyncServiceWorker();
+      const {workerData} = require('worker_threads');
+      if(workerData) require(workerData.mainPath).startSyncServiceWorker();
       else setImmediate(start);
     }
   `, {
