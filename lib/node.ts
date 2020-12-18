@@ -277,8 +277,16 @@ let workerThreadService: WorkerThreadService | null = null;
 
 let startWorkerThreadService = (worker_threads: typeof import('worker_threads')): WorkerThreadService => {
   let { port1: mainPort, port2: workerPort } = new worker_threads.MessageChannel();
-  let worker = new worker_threads.Worker(path.join(__dirname, 'node_worker_thread.js'), {
-    workerData: workerPort,
+  let worker = new worker_threads.Worker(`
+    start();
+    function start() {
+      const {workerData: {mainPath}} = require('worker_threads');
+      if(mainPath) require(mainPath).startSyncServiceWorker();
+      else setImmediate(start);
+    }
+  `, {
+    eval: true,
+    workerData: {workerPort, mainPath: __filename},
     transferList: [workerPort],
   });
   let nextID = 0;
@@ -352,11 +360,12 @@ let startWorkerThreadService = (worker_threads: typeof import('worker_threads'))
 };
 
 export let startSyncServiceWorker = () => {
-  let workerPort: import('worker_threads').MessagePort = worker_threads!.workerData;
+  let workerData = worker_threads!.workerData;
   let parentPort = worker_threads!.parentPort!;
-  if(!parentPort || !workerPort) {
+  if(!parentPort || !workerData) {
     setImmediate(startSyncServiceWorker);
   }
+  let workerPort: import('worker_threads').MessagePort = workerData.workerPort;
   let servicePromise = startService();
 
   // MessagePort doesn't copy the properties of Error objects. We still want
